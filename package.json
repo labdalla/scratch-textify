@@ -1,0 +1,26 @@
+{
+  "name": "scratch-classification",
+  "version": "1.0.0",
+  "description": "Experiments involving Scratch project vectorization and classification by type.",
+  "main": "parse_projects.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/labdalla/scratch-classification.git"
+  },
+  "author": "Lena Abdalla / Scratch Team",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/labdalla/scratch-classification/issues"
+  },
+  "homepage": "https://github.com/labdalla/scratch-classification#readme",
+  "dependencies": {
+    "curl-request": "^1.1.1",
+    "fast-csv": "^3.4.0",
+    "graceful-fs": "^4.2.2",
+    "scratch-parser": "^5.0.0",
+    "yargs": "^14.2.0"
+  }
+}

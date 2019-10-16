@@ -12,7 +12,7 @@ SOURCES:
 */
 
 const curl = new (require('curl-request'))();
-const util = require('util');
+// const util = require('util');
 const argv = require('yargs').argv;
 
 var csv = require("fast-csv");
