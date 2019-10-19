@@ -12,13 +12,11 @@ SOURCES:
 */
 
 const curl = new (require('curl-request'))();
-// const util = require('util');
 const argv = require('yargs').argv;
-
-var csv = require("fast-csv");
-var fs = require("fs");
-var graceful_fs = require("graceful-fs")
-var parser = require("scratch-parser");
+const csv = require("fast-csv");
+const fs = require("fs");
+const graceful_fs = require("graceful-fs");
+const parser = require("scratch-parser");
 
 
 // ===================================================== LEGEND / MAPPING ==============================================================
@@ -198,6 +196,7 @@ var csvStream = csv.parse()
   })
   .on("end", function() {
     console.log("done constructing the list of the project ids")
+    
     graceful_fs.open(text_file, "w", function(err, file) {
       if (err) throw err
       console.log("File saved: " + text_file)
@@ -212,6 +211,8 @@ var csvStream = csv.parse()
       generate_curl_requests([argv.project_id])
 
     });
+
+
 
   });
 
