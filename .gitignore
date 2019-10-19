@@ -5,5 +5,4 @@ package-lock.json
 npm-*
 
 /sb3_files
-/data/*.txt
 BUGS.txt
