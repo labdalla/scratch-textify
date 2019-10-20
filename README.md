@@ -23,3 +23,36 @@ from top to bottom.
 - If you'd like to change the output file where the parse results are written, add the following command line argument:
   
       $ node parse_projects.js --output_path <path_to_output_file>
+
+## Syntax Mapping
+  `_STARTSTACK_`: beginning of new stack
+  
+  `_ENDSTACK_`: end of new stack
+  
+  `_STARTNEST_`: beginning of nesting
+  
+  `_ENDNEST_`: end of nesting
+  
+  `_STARTINPUT_`: beginning of input
+  
+  `_ENDINPUT_`: end of input
+  
+  `numtext_input`: number or text input
+  
+  `_VAR_`: variable
+  
+  `_LIST_`: list
+  
+  `menu_option`: chosen menu option
+  
+  `_MENU_`: dropdown menu
+  
+  `_NUMTEXTARG_`: number or text argument (only used with procedures_definition block)
+  
+  `_BOOLARG_`: boolean argument (only used with procedures_definition block)
+  
+  `procedures_definition`: custom procedure definition (will be used whenever a new custom procedure is defined)
+  
+  `procedures_call`: custom procedure call (will be used whenever a custom procedure is called)
+  
+  `_NEXT_`: next (meaning, blocks are ordered in the string and separated by this symbol)
