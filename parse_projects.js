@@ -9,7 +9,28 @@ SOURCES:
     - https://www.npmjs.com/package/curl-request
     - parser function used below was provided from the scratch-parser node module (written and provided by Scratch Team)
 
+INSTRUCTIONS:
+    To parse a single project, run the following command from your terminal:
+      $ node parse_projects.js --project_id <desired_project_id>
+
+    To parse a list of projects at once, do the following:
+      - add a csv file containing a list of project ids to the top level /scratch-textify directory.
+      - add the name of that csv as a command line argument and run the following command:
+          $ node parse_projects.js --project_ids_csv <csv_filename>
+
+    If you'd like to change the output file where the parse results are written, add the following command line argument:
+      $ node parse_projects.js --output_path <path_to_output_file>
+
+    Defaults:
+      project ids csv: partial_project_ids.csv (a list of 29 project ids)
+      output path: data/train.txt (contains all the parsed projects in that file.)
+
+OUTPUT:
+    Depending on whether you set the output file path, the output text will either be found in data/train.txt (default) or in the user-defined output path.
+
 */
+
+
 
 const curl = new (require('curl-request'))();
 const argv = require('yargs').argv;
@@ -17,6 +38,8 @@ const csv = require("fast-csv");
 const fs = require("fs");
 const graceful_fs = require("graceful-fs");
 const parser = require("scratch-parser");
+const convert = require('./convert_sb2_to_sb3.js');
+
 
 
 // ===================================================== LEGEND / MAPPING ==============================================================
@@ -43,82 +66,12 @@ var legend = {
   " _NEXT_ ": "next" // meaning, blocks are ordered in the string and separated by this symbol
 }
 
+// This list is for informational purposes only, in case you want inspiration for example Scratch projects to test script with.
+var example_test_projects = [286136792, 303772729, 10128407]
+
+
 
 // ===================================================== SCRIPT ==============================================================
-
-// const INPUT_TYPES = [ 'BACKDROP',
-//                       'BEATS',
-//                       'BROADCAST_INPUT',
-//                       'BROADCAST_OPTION', // check this
-//                       'CHANGE',
-//                       'CLONE_OPTION',
-//                       'COLOR',
-//                       'COLOR2',
-//                       'CONDITION',
-//                       'COSTUME',
-//                       'CURRENTMENU', // check this
-//                       'DEGREES',
-//                       'DIRECTION',
-//                       'DISTANCE', // check this
-//                       'DISTANCETOMENU',
-//                       'DRAG_MODE', // check this
-//                       'DURATION',
-//                       'DX',
-//                       'DY',
-//                       'EFFECT', // check this
-//                       'FORWARD_BACKWARD', // check this
-//                       'FROM',
-//                       'FRONT_BACK', // check this
-//                       'HUE', // check this
-//                       'INDEX', // check this
-//                       'ITEM', // check this
-//                       'KEY_OPTION',
-//                       'LETTER',
-//                       'LIST', // check this
-//                       'MESSAGE',
-//                       'MOTOR_DIRECTION', // check this
-//                       'MOTOR_ID', // check this
-//                       'MOTOR_REPORTER_ID', // check this
-//                       'NOTE', // check this
-//                       'NUM',
-//                       'NUM1',
-//                       'NUM2',
-//                       'NUMBER_NAME', // check this
-//                       'OBJECT',
-//                       'OPERAND',
-//                       'OPERAND1',
-//                       'OPERAND2',
-//                       'OPERATOR', // check this
-//                       'PORT', // check this
-//                       'POWER', // check this
-//                       'PROPERTY', // check this
-//                       'PUSH_PULL', // check this
-//                       'QUESTION',
-//                       'ROTATION', // check this
-//                       'SECS',
-//                       'SIZE',
-//                       'SOUND_MENU',
-//                       'STEPS',
-//                       'STRING',
-//                       'STRING1',
-//                       'STRING2',
-//                       'STYLE',
-//                       'SUBSTACK',
-//                       'SUBSTACK2',
-//                       'STOP_OPTION', // check this
-//                       'TILT_DIRECTION', // check this
-//                       'TILT_DIRECTION_ANY', // check this
-//                       'TIME', // check this
-//                       'TIMES',
-//                       'TO',
-//                       'TOUCHINGOBJECTMENU',
-//                       'TOWARDS',
-//                       'VALUE',
-//                       'VARIABLE', // check this
-//                       'VOLUME',
-//                       'WHENGREATERTHANMENU', // check this
-//                       'X',
-//                       'Y' ]
 
 const HAT_BLOCKS = [  "event_whenflagclicked",
                       "event_whenkeypressed",
@@ -174,17 +127,31 @@ var PROJECT_IDS = []
 
 // Read in the appropriate csv file and construct the list of project ids.
 // Then, open a text file to write the sequences of blocks to it.
+var csv_file;
+if (argv.project_ids_csv) {
+  csv_file = argv.project_ids_csv + ".csv"
+}
 
-// var csv_file = "project_ids_train.csv"
-// var csv_file = "project_ids_valid.csv"
-// var csv_file = "project_ids_test.csv"
-var csv_file = "all_project_ids.csv"
+else {
+  // csv_file = "project_ids_train.csv"
+  // csv_file = "project_ids_valid.csv"
+  // csv_file = "project_ids_test.csv"
+  csv_file = "all_project_ids.csv"
+  // csv_file = "partial_project_ids.csv"
+}
 
+var text_file;
+if (argv.output_path) {
+  text_file = argv.output_path
+}
+else {
+  text_file = "data/train.txt"
+  // text_file = "data_stacks_as_sequences/valid.txt"
+  // text_file = "data_stacks_as_sequences/test.txt"
+}
 
-var text_file = "data/train.txt"
-// var text_file = "data_stacks_as_sequences/valid.txt"
-// var text_file = "data_stacks_as_sequences/test.txt"
-
+console.log("csv_file: ", csv_file)
+console.log("text_file: ", text_file)
 
 var stream = fs.createReadStream(csv_file)
 var csvStream = csv.parse()
@@ -196,19 +163,18 @@ var csvStream = csv.parse()
   })
   .on("end", function() {
     console.log("done constructing the list of the project ids")
-    
+
     graceful_fs.open(text_file, "w", function(err, file) {
       if (err) throw err
       console.log("File saved: " + text_file)
       console.log("Size of PROJECT_IDS: ", PROJECT_IDS.length)
-      // TODO: change this back so it runs it with all projects (as opposed to only individual test projects)
-      // generate_curl_requests(PROJECT_IDS)
+      if (argv.project_id) {
+        generate_curl_requests([argv.project_id])
+      }
 
-      // TEST RUNS: for specific projects, to ensure script is working properly
-      // generate_curl_requests([286136792])
-      // generate_curl_requests([303772729])
-      // generate_curl_requests([10128407])
-      generate_curl_requests([argv.project_id])
+      else {
+        generate_curl_requests(PROJECT_IDS)
+      }
 
     });
 
@@ -255,34 +221,46 @@ async function generate_curl_requests(project_ids) {
         body = JSON.stringify(body)
       }
 
+      // TODO: check with Karishma if convert function works for converting both sb and sb2 formats into sb3.
+      // Convert the current project to sb3 (in case it was sb or sb2) *before* passing it into parser.
+      convert(project_id.toString())
+      .then((result) => {
+        // console.log("s3_project: ", result)
+        // console.log("type: ", typeof(result))
 
-      // Parse the current project
-      parser(body, false, function(err, results) {
-        all_projects_count += 1
+        body = result
 
-        if (err) {
-          console.log("ERROR: ", err)
-        }
-        else {
-          project = results[0]
-          project_version = project.projectVersion
+        // Parse the converted project
+        parser(body, false, (err, results) => {
+          all_projects_count += 1
 
-          // var blocks = {}
-          var blocks_text = ""
-
-          if (project_version == 1) {
-            version_1_projects_count += 1
+          if (err) {
+            console.log("ERROR: ", err)
           }
 
-          if (project_version == 2) {
-            version_2_projects_count += 1
-          }
+          else {
+            project = results[0]
+            project_version = project.projectVersion
 
-          // Parse SB3 Format
-          if (project_version == 3) {
-            version_3_projects_count += 1
+            var blocks_text = ""
 
-            project.targets.forEach(function(entity) {
+            // TODO: check with Karishma if my script can convert from sb1 to sb3. If so, lump this case with the sb2 case below.
+            //        for now, ignore it!
+            if (project_version == 1) {
+              version_1_projects_count += 1
+            }
+
+            if (project_version == 2) {
+              version_2_projects_count += 1
+            }
+
+            if (project_version == 3) {
+              version_3_projects_count += 1
+            }
+
+            blocks_text += "\n\n ############ Project " + project_id.toString() + " ############ \n\n"
+
+            project.targets.forEach((entity) => {
               // entity is either a stage or a sprite
 
               // TODO: remove this once you're done debugging your script!
@@ -290,7 +268,7 @@ async function generate_curl_requests(project_ids) {
 
               var block_ids = Object.keys(entity.blocks)
 
-              block_ids.forEach(function(block_id) {
+              block_ids.forEach((block_id) => {
                 // a block can only be a topLevel for one stack of blocks / code
                 // but each sprite or stage might have more than one stack of blocks
                 // and therefore, more than one block with topLevel attribute set to true
@@ -326,14 +304,17 @@ async function generate_curl_requests(project_ids) {
             // TODO: uncomment back the line below to remove whitespace (once you're done testing your code)
             // blocks_text = blocks_text.replace(/\s+/g,' ').trim()
             to_add = blocks_text + "\n"
-            console.log("to_add: ", to_add)
+            // console.log("to_add: ", to_add)
             graceful_fs.appendFile(text_file, to_add, function(err) {
               if (err) throw err;
             });
-          }
 
-        }
+          }
+        });
+
       });
+
+
     });
 
   }
