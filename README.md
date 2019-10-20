@@ -24,6 +24,14 @@ from top to bottom.
   
       $ node parse_projects.js --output_path <path_to_output_file>
 
+## Output
+Depending on whether you set the output file path, the output text will either be found in `data/train.txt` (default) or in the user-defined output path. 
+
+## Defaults:
+project ids csv: `partial_project_ids.csv` (a list of 29 project ids)
+
+output path: `data/train.txt` (contains all the parsed projects in that file)
+  
 ## Syntax Mapping
   `_STARTSTACK_`: beginning of new stack
   
