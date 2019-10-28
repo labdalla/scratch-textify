@@ -4,7 +4,7 @@ ABOUT:
     Written by: Karishma Chadha, Lena Abdalla
 */
 const graceful_fs = require("graceful-fs");
-const timeout_promise = require('./timeout-promise.js')
+// const timeout_promise = require('./timeout-promise.js')
 
 const VM = require('scratch-vm');
 const STORAGE = require('scratch-storage');
@@ -54,18 +54,22 @@ const convert = function(project_id) {
       .then(projectAsset => {
           return vm.loadProject(projectAsset.data);
       })
-      .catch((err) => {
-        console.log("======== project_id (from error in convert): ", project_id)
-        console.log("ERROR: ")
-        console.log(err)
-        reject(Error(err))
-      })
       .then(() => {
           const project_json = vm.toJSON(); // only one project ever that's loaded to the VM; VM is the brain of the editor, only responsible for current project that's loaded into the editor
         // return project_json;
+          // console.log(project_json);
           console.log("======== project_id (from resolve in convert): ", project_id)
           resolve(project_json);
+          return;
       })
+      .catch((err) => {
+          console.log("======== project_id (from error in convert): ", project_id)
+          console.log("ERROR: ")
+          console.log(err)
+          reject(Error(err));
+          return;
+      })
+
     }
   )
 
@@ -74,8 +78,8 @@ const convert = function(project_id) {
 
 module.exports = convert;
 
-// // convert("337467560");
-// // convert("12758695");
+// convert("130061967");
+// convert("306933614");
 // convert("331309320")
 // .then((project_json) =>
 //   console.log(project_json));

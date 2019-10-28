@@ -229,7 +229,7 @@ const task = function(project_id, callback) {
 }
 
 
-const q = async.queue(task, 1)
+const q = async.queue(task, 1);
 
 
 q.drain(function() {
