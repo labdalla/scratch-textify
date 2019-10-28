@@ -23,10 +23,10 @@ INSTRUCTIONS:
 
     Defaults:
       project ids csv: partial_project_ids.csv (a list of 29 project ids)
-      output path: data/train.txt (contains all the parsed projects in that file.)
+      output path: data/dataset.txt (contains all the parsed projects in that file.)
 
 OUTPUT:
-    Depending on whether you set the output file path, the output text will either be found in data/train.txt (default) or in the user-defined output path.
+    Depending on whether you set the output file path, the output text will either be found in data/dataset.txt (default) or in the user-defined output path.
 
 */
 
@@ -37,9 +37,10 @@ const argv = require('yargs').argv;
 const csv = require("fast-csv");
 const fs = require("fs");
 const graceful_fs = require("graceful-fs");
+const async = require('async');
 const parser = require("scratch-parser");
 const convert = require('./convert_sb2_to_sb3.js');
-
+// const timeout_promise = require('./timeout-promise.js')
 
 
 // ===================================================== LEGEND / MAPPING ==============================================================
@@ -124,6 +125,10 @@ const EXCEPTIONS = [ "note" ]
 
 var PROJECT_IDS = []
 
+var ERRORS = ""
+
+const ERRORS_TEXT_FILE = "errors.txt"
+
 
 // Read in the appropriate csv file and construct the list of project ids.
 // Then, open a text file to write the sequences of blocks to it.
@@ -142,13 +147,16 @@ else {
 
 var text_file;
 if (argv.output_path) {
-  text_file = argv.output_path
+  text_file = argv.output_path + ".txt"
 }
 else {
-  text_file = "data/train.txt"
+  text_file = "data/dataset.txt"
   // text_file = "data_stacks_as_sequences/valid.txt"
   // text_file = "data_stacks_as_sequences/test.txt"
 }
+
+// this text file contains all the projects that were successfully textified and written to the output text file.
+var ids_file = "data/textified_project_ids.txt"
 
 console.log("csv_file: ", csv_file)
 console.log("text_file: ", text_file)
@@ -164,19 +172,20 @@ var csvStream = csv.parse()
   .on("end", function() {
     console.log("done constructing the list of the project ids")
 
-    graceful_fs.open(text_file, "w", function(err, file) {
-      if (err) throw err
-      console.log("File saved: " + text_file)
-      console.log("Size of PROJECT_IDS: ", PROJECT_IDS.length)
-      if (argv.project_id) {
-        generate_curl_requests([argv.project_id])
-      }
+    console.log("Size of PROJECT_IDS: ", PROJECT_IDS.length)
+    if (argv.project_id) {
+      q.push([argv.project_id]);
+    }
 
-      else {
-        generate_curl_requests(PROJECT_IDS)
-      }
+    else {
+      q.push(PROJECT_IDS);
+    }
 
-    });
+    // graceful_fs.open(text_file, "w", function(err, file) {
+    //   if (err) throw err
+    //
+    //
+    // });
 
 
 
@@ -188,142 +197,172 @@ var csvStream = csv.parse()
 
 // =============================================== HELPER FUNCTIONS ===============================================================
 
-/**
-* Async helper function to iterate through the compiled list of project_ids,
-* and generate curl requests and wait for them to finish, then process the projects.
-* @param {array} project_ids   array of project ids to iterate through
-* @return {void} this function doesn't return anything; it only writes to the output text file.
-*
-* Documentation used: https://lavrton.com/javascript-loops-how-to-handle-async-await-6252dd3c795/
-*/
 
-async function generate_curl_requests(project_ids) {
-  var version_1_projects_count = 0
-  var version_2_projects_count = 0
-  var version_3_projects_count = 0
-  var all_projects_count = 0
+const task = function(project_id, callback) {
+  console.log("PROJECT_ID: ", project_id)
+  async.waterfall([
+    // dummy function that passes on the project_id into the convertProject function;
+    // seems to be the best way to do this.
+    function(callback) {
+      callback(null, project_id);
+    },
+    convertProject,
+    parseProject,
+    textifyProject,
+    writeResults
+  ], function (err, result) {
+    // log the ERRORS string to record faulty projects
+    logErrors(ERRORS)
+    .then(status => {
+      // result is project_id
+      console.log("======= done with ", result);
+      // overwrite the global ERRORS string to be empty again
+      ERRORS = "";
+      callback();
+    })
+    .catch((err) => {
+      throw err;
+    })
 
-  // var blocks_text_all_projects = []
 
-  for (const project_id of project_ids) {
-    await curl.get("https://projects.scratch.mit.edu/" + project_id)
-    .then(({statusCode, body, headers}) => {
-      // statusCode = 200 means successful HTTP request.
-      if (statusCode != 200) {
-        console.log("ERROR: ")
-        console.log("====== statusCode is: ", statusCode)
-        console.log("====== project_id for this is: ", project_id)
+  });
+}
+
+
+const q = async.queue(task, 1)
+
+
+q.drain(function() {
+  // when everything is done,
+  // log all the project ids that had associated errors
+  logErrors(ERRORS);
+  console.log("========= EVERYTHING IS DONE!")
+});
+
+// print out the status of the queue workers list every second.
+setInterval(function () {
+  console.log("************** QUEUE INFORMATION **************");
+  console.dir(q.length());
+  console.dir(q.running());
+  console.dir(q.workersList());
+}, 1000);
+
+
+function convertProject(project_id, callback) {
+    console.log("PROJECT_ID: ", project_id)
+    convert(project_id.toString())
+    .then((result) => {
+      callback(null, result, project_id);
+    })
+    .catch((err) => {
+      ERRORS += project_id + "\n"
+      callback(err); // stops the waterfall
+    });
+}
+
+function parseProject(body, project_id, callback) {
+    // Parse the converted project
+    parser(body, false, (err, results) => {
+      if (err) {
+        ERRORS += project_id + "\n"
+        callback(err);
       }
 
-      console.log("statusCode: ", statusCode)
-
-      if (typeof(body) === "object") {
-        body = JSON.stringify(body)
+      else {
+        project = results[0]
+        project_version = project.projectVersion
+        callback(null, project, project_id);
       }
+    });
+}
 
-      // TODO: check with Karishma if convert function works for converting both sb and sb2 formats into sb3.
-      // Convert the current project to sb3 (in case it was sb or sb2) *before* passing it into parser.
-      convert(project_id.toString())
-      .then((result) => {
-        // console.log("s3_project: ", result)
-        // console.log("type: ", typeof(result))
 
-        body = result
+function textifyProject(project, project_id, callback) {
+    var blocks_text = ""
 
-        // Parse the converted project
-        parser(body, false, (err, results) => {
-          all_projects_count += 1
+    // TODO: remove this line in final version of the script.
+    // blocks_text += "\n\n ############ Project " + project_id.toString() + " ############ \n\n"
 
-          if (err) {
-            console.log("ERROR: ", err)
-          }
+    project.targets.forEach((entity) => {
+      // entity is either a stage or a sprite
 
-          else {
-            project = results[0]
-            project_version = project.projectVersion
+      // TODO: remove this once you're done debugging your script!
+      // blocks_text += "\n\n ============ " + entity.name + " ============ \n\n"
 
-            var blocks_text = ""
+      var block_ids = Object.keys(entity.blocks)
 
-            // TODO: check with Karishma if my script can convert from sb1 to sb3. If so, lump this case with the sb2 case below.
-            //        for now, ignore it!
-            if (project_version == 1) {
-              version_1_projects_count += 1
-            }
+      block_ids.forEach((block_id) => {
+        // a block can only be a topLevel for one stack of blocks / code
+        // but each sprite or stage might have more than one stack of blocks
+        // and therefore, more than one block with topLevel attribute set to true
 
-            if (project_version == 2) {
-              version_2_projects_count += 1
-            }
+        // Thus, we can iterate through all the blocks in a sprite (by iterating through their ids),
+        // and only look at those blocks that are at the topLevel.
+        // If they are, we then begin traversing the path down to the end of the stack,
+        // and add each block we see, using the rules and symbols defined in the legend above,
+        // until we get to the end of that stack.
+        // The next time we see a block with topLevel = true, it will be representing a different stack of blocks.
+        var block_object = entity.blocks[block_id]
+        // Look for blocks that are topLevel, and *not* shadow blocks (bug), and are either hat blocks (i.e. don't traverse stacks that aren't headed by a hat block), or are procedure definition blocks
+        // if ((block_object.topLevel) && (!block_object.shadow)) {
+        if ((block_object.topLevel) && (!block_object.shadow) && (HAT_BLOCKS.includes(block_object.opcode) || (block_object.opcode === "procedures_definition")) ) {
+          // Start traversing this stack till the end
+          // Each time, get the opcode (i.e. name) of the current block
+          // Add the { symbol representing a new stack starting
+          blocks_text += " _STARTSTACK_ "
+          blocks_string = traverse(entity.blocks, block_object)
+          blocks_text += blocks_string
+          blocks_text += " _ENDSTACK_ "
 
-            if (project_version == 3) {
-              version_3_projects_count += 1
-            }
+        }
+      });
 
-            blocks_text += "\n\n ############ Project " + project_id.toString() + " ############ \n\n"
+    });
+    // Add the sequence that represents the current project to the text file and start a new line for the next project
+    // Remove extraneous whitespace
+    // TODO: uncomment back the line below to remove whitespace (once you're done testing your code)
+    blocks_text = blocks_text.replace(/\s+/g,' ').trim()
+    // project_text = blocks_text + "\n"
+    project_text = blocks_text
+    callback(null, project_text, project_id);
+}
 
-            project.targets.forEach((entity) => {
-              // entity is either a stage or a sprite
 
-              // TODO: remove this once you're done debugging your script!
-              blocks_text += "\n\n ============ " + entity.name + " ============ \n\n"
-
-              var block_ids = Object.keys(entity.blocks)
-
-              block_ids.forEach((block_id) => {
-                // a block can only be a topLevel for one stack of blocks / code
-                // but each sprite or stage might have more than one stack of blocks
-                // and therefore, more than one block with topLevel attribute set to true
-
-                // Thus, we can iterate through all the blocks in a sprite (by iterating through their ids),
-                // and only look at those blocks that are at the topLevel.
-                // If they are, we then begin traversing the path down to the end of the stack,
-                // and add each block we see, using the rules and symbols defined in the legend above,
-                // until we get to the end of that stack.
-                // The next time we see a block with topLevel = true, it will be representing a different stack of blocks.
-                var block_object = entity.blocks[block_id]
-                // Look for blocks that are topLevel, and *not* shadow blocks (bug), and are either hat blocks (i.e. don't traverse stacks that aren't headed by a hat block), or are procedure definition blocks
-                // if ((block_object.topLevel) && (!block_object.shadow)) {
-                if ((block_object.topLevel) && (!block_object.shadow) && (HAT_BLOCKS.includes(block_object.opcode) || (block_object.opcode === "procedures_definition")) ) {
-                  // Start traversing this stack till the end
-                  // Each time, get the opcode (i.e. name) of the current block
-                  // Add the { symbol representing a new stack starting
-                  blocks_text += " _STARTSTACK_ "
-
-                  blocks_string = traverse(entity.blocks, block_object)
-
-                  blocks_text += blocks_string
-
-                  blocks_text += " _ENDSTACK_ "
-
-                }
-              });
-
-            });
-
-            // Add the sequence that represents the current project to the text file and start a new line for the next project
-            // Remove extraneous whitespace
-            // TODO: uncomment back the line below to remove whitespace (once you're done testing your code)
-            // blocks_text = blocks_text.replace(/\s+/g,' ').trim()
-            to_add = blocks_text + "\n"
-            // console.log("to_add: ", to_add)
-            graceful_fs.appendFile(text_file, to_add, function(err) {
-              if (err) throw err;
-            });
-
-          }
-        });
-
+function writeResults(project_text, project_id, callback) {
+  if (project_text.length === 0) {
+    callback(null, project_id); // complete the waterfall
+    return;
+  }
+    graceful_fs.appendFile(text_file, project_text + "\n", function(err) {
+      // if (err) return callback(err);
+      if (err) callback(err);
+      // write project id to another file to keep track
+      graceful_fs.appendFile(ids_file, project_id + "\n", function(err) {
+        if (err) callback(err);
+        callback(null, project_id); // complete the waterfall
       });
 
 
     });
-
-  }
-  console.log("version_1_projects_count = ", version_1_projects_count)
-  console.log("version_2_projects_count = ", version_2_projects_count)
-  console.log("version_3_projects_count = ", version_3_projects_count)
-  console.log("all_projects_count = ", all_projects_count)
 }
 
+function logErrors(errors) {
+  return new Promise((resolve, reject) => {
+    if (ERRORS.length === 0) {
+      // don't write anything to the file
+      resolve("success");
+      return;
+    }
+    graceful_fs.appendFile(ERRORS_TEXT_FILE, errors, function(err) {
+      if (err) {
+        reject(Error(err));
+        return;
+      }
+      resolve("success");
+    });
+  });
+
+}
 
 
 /**
