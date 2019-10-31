@@ -49,9 +49,11 @@ const convert = function(project_id) {
 
   // TODO: check with Karishma whether what I wrote here for Promise is a correct use of promises and makes sense.
   return new Promise((resolve, reject) => {
+      // console.log("just before running the storage.load function");
     // timeout_promise(30000, storage.load(storage.AssetType.Project, project_id))
       storage.load(storage.AssetType.Project, project_id) // load project from project server (e.g. projects.scratch.mit.edu)
       .then(projectAsset => {
+          // console.log("stuck inside .then of storage.load function in convert.js");
           return vm.loadProject(projectAsset.data);
       })
       .then(() => {

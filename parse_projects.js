@@ -318,6 +318,9 @@ function textifyProject(project, project_id, callback) {
       });
 
     });
+
+    // console.log("stuck inside textifyProject");
+
     // Add the sequence that represents the current project to the text file and start a new line for the next project
     // Remove extraneous whitespace
     // TODO: uncomment back the line below to remove whitespace (once you're done testing your code)
@@ -333,6 +336,8 @@ function writeResults(project_text, project_id, callback) {
     callback(null, project_id); // complete the waterfall
     return;
   }
+    // console.log("stuck inside writeProject");
+
     graceful_fs.appendFile(text_file, project_text + "\n", function(err) {
       // if (err) return callback(err);
       if (err) callback(err);
