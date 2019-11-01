@@ -2,8 +2,42 @@
 // Each batch would be 1000 projects.
 
 const process = require('child_process');
+const graceful_fs = require("graceful-fs");
 
-var num_batches = 600
+// TODO: change NUM_BATCHES back to 600 when done testing!
+const NUM_BATCHES = 10
+// const NUM_BATCHES = 600
+const MASTER_LOG = "data/master.log"
+
+
+const MASTER_PROJECT_IDS_CSV = "data/project_ids.csv"
+const MASTER_PROJECT_IDS = []
+
+
+var stream = fs.createReadStream(MASTER_PROJECT_IDS_CSV)
+var csvStream = csv.parse()
+  .on("data", function(data) {
+    if (data[0] != "id") {
+      MASTER_PROJECT_IDS.push(data[0])
+    }
+
+  })
+  .on("end", function() {
+    console.log("done constructing the list of the project ids")
+    console.log("Size of PROJECT_IDS: ", MASTER_PROJECT_IDS.length)
+
+    textifyDataset (1);
+
+
+
+  });
+
+  stream.pipe(csvStream)
+
+
+
+
+
 
 /**
 * Textifies the entire dataset in batches of 1000 projects at a time. Expects the current batch to be passed in as input
@@ -14,37 +48,86 @@ var num_batches = 600
 * Defined recursively until the the last batch is reached.
 *
 * @param {string} path to csv file containing batch of project ids.
+* @param {int} batch_index the index of the current batch we are processing. e.g if num_batch = 4, then we are processing the fourth batch, which corresponds to indices 3000-3999
+
 * @return {void}
 **/
-function textifyDataset (path, current_batch) {
+function textifyDataset (batch_index) {
 
-  // base case:  no more batches to textify
-  if (num_batches === 0) {
+  console.log("batch_index: ", batch_index);
+
+  // base case:  no more batches to textify, since we got to the 600th batch
+  if (batch_index === NUM_BATCHES) {
     return
   }
 
+  // calculate the current batch index range
+  low = (batch_index - 1)*1000
+  high = batch_index*1000 - 1 // e.g. 3999
+  current_batch = low.toString() + "-" + high.toString()
 
-  // modify the global variable to account for having handled the current batch
-  num_batches -= 1
-  // TODO: calculate current_batch here accordingly to get passed in to next recursive function
-  
-}
+  console.log("current_batch: ", current_batch);
 
-/**
-* Fork a new process to textify the given project ids.
-*
-* @param {string} path to csv file containing batch of  project ids
-**/
-function fork (path, current_batch) {
-  // TODO: current_batch should be a string denoting the index range of projects we are considering (e.g 0-1000 for the first batch)
+  // create the corresponding project ids csv file for the current batch
+  current_project_ids = MASTER_PROJECT_IDS.slice(low, (high+1))
+  // TODO: find out if you can have a list of project ids as a command line argument to parse_projects.js
+
+  // setup the command line arguments
+  var project_ids_arg = "--project_ids project_ids_" + current_batch
+  var textified_projects_arg = "--textified_projects " + current_batch // TODO: add such a command line argument to parse_projects.js script!
+  var textified_ids_arg = "--textified_ids " + current_batch // TODO: add such a command line argument to parse_projects.js script!
+  var errors_arg = "--errors " + current_batch// TODO: add such a command line argument to parse_projects.js script!
 
 
-  var csv_arg = "--project_ids_csv " + current_batch + ".csv"
-  var dataset_arg = "--dataset_filepath" + current_batch + "_dataset.txt"// TODO: add such a command line argument to parse_projects.js script!
-  var project_ids_arg = "--textified_ids_filepath" + current_batch + "_textified_ids.txt" // TODO: add such a command line argument to parse_projects.js script!
-  var error_arg = "--error_filepath " + current_batch + "_errors.txt"// TODO: add such a command line argument to parse_projects.js script!
+  var next_batch_index = batch_index + 1
 
-  var forked_process = process.fork("parse_projects.js", [csv_arg, dataset_arg, project_ids_arg, error_arg]);
+  // Otherwise, fork a new process and wait for it to exit before moving on to the next batch
+  var forked_process = process.fork("parse_projects.js", [project_ids_arg, textified_projects_arg, textified_ids_arg, errors_arg]);
 
-  // listen to different events from forked_process
+
+  forked_process.on('exit', (code) => {
+    console.log('child process exited with code ${code}');
+
+    // Code = 0 means successful exiting
+    if (code === 0) {
+      // log success
+      success = "***** SUCCESS ***** " + current_batch + "\n"
+      graceful_fs.appendFile(MASTER_LOG, success, function(err) {
+        // recursive step
+        textifyDataset(next_batch_index);
+      });
+    }
+
+    // Code != 0 means error
+    else if (code !== 0) {
+      // log error
+      error = "***** ERROR ***** " + current_batch + "\n"
+      graceful_fs.appendFile(MASTER_LOG, error, function(err) {
+        // recursive step
+        textifyDataset(next_batch_index);
+      });
+    }
+  });
+
+
+  forked_process.on('close', (code, signal) => {
+    console.log('child process terminated due to receiving signal ${signal}');
+
+    // recursive step
+    textifyDataset(next_batch_index);
+  });
+
+
+  // Watchdog timer for 10 mins
+  setTimeout(function() {
+    console.log('batch ' + current_batch + ' timed out!');
+
+    // log timeout
+    timeout = "***** TIMEOUT ***** " + current_batch + "\n"
+    graceful_fs.appendFile(MASTER_LOG, timeout, function(err) {
+      // kill process after logging the timeout
+      forked_process.kill('SIGHUP');
+    });
+  }, 600000)
+
 }

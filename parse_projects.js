@@ -127,36 +127,44 @@ var PROJECT_IDS = []
 
 var ERRORS = ""
 
-const ERRORS_TEXT_FILE = "errors.txt"
+// const ERRORS_TEXT_FILE = "errors.txt"
 
 
 // Read in the appropriate csv file and construct the list of project ids.
 // Then, open a text file to write the sequences of blocks to it.
 var csv_file;
-if (argv.project_ids_csv) {
-  csv_file = argv.project_ids_csv + ".csv"
+if (argv.project_ids) {
+  csv_file = argv.project_ids + ".csv"
 }
-
 else {
-  // csv_file = "project_ids_train.csv"
-  // csv_file = "project_ids_valid.csv"
-  // csv_file = "project_ids_test.csv"
   csv_file = "all_project_ids.csv"
-  // csv_file = "partial_project_ids.csv"
 }
 
 var text_file;
-if (argv.output_path) {
-  text_file = argv.output_path + ".txt"
+if (argv.textified_projects) {
+  text_file = argv.textified_projects + ".txt"
 }
 else {
-  text_file = "data/dataset.txt"
-  // text_file = "data_stacks_as_sequences/valid.txt"
-  // text_file = "data_stacks_as_sequences/test.txt"
+  text_file = "data/textified_projects.txt"
 }
 
-// this text file contains all the projects that were successfully textified and written to the output text file.
-var ids_file = "data/textified_project_ids.txt"
+// this text file contains the ids of all the projects that were successfully textified and written to the output text file.
+var ids_file;
+if (argv.textified_ids) {
+  ids_file = argv.textified_ids + ".ids"
+}
+else {
+  ids_file = "data/textified_ids.ids"
+}
+
+var errors_file;
+if (argv.errors) {
+  ids_file = argv.errors + ".err"
+}
+else {
+  ids_file = "data/errors.err"
+}
+
 
 console.log("csv_file: ", csv_file)
 console.log("text_file: ", text_file)
@@ -358,7 +366,7 @@ function logErrors(errors) {
       resolve("success");
       return;
     }
-    graceful_fs.appendFile(ERRORS_TEXT_FILE, errors, function(err) {
+    graceful_fs.appendFile(errors_file, errors, function(err) {
       if (err) {
         reject(Error(err));
         return;
