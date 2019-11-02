@@ -2,3 +2,5 @@
 *
 # Except this file
 !.gitignore
+!dataset.txt
+!textified_project_ids.txt

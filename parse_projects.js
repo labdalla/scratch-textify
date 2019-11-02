@@ -130,16 +130,16 @@ var ERRORS = ""
 // const ERRORS_TEXT_FILE = "errors.txt"
 
 
-// Read in the appropriate csv file and construct the list of project ids.
-// Then, open a text file to write the sequences of blocks to it.
+// Project ids input file, containing ids of all projects to be textified
 var csv_file;
 if (argv.project_ids) {
   csv_file = argv.project_ids + ".csv"
 }
 else {
-  csv_file = "all_project_ids.csv"
+  csv_file = "ids/project_ids_1.csv"
 }
 
+// Textified projects output file. All textified projects will be written to this location.
 var text_file;
 if (argv.textified_projects) {
   text_file = argv.textified_projects + ".txt"
@@ -148,7 +148,7 @@ else {
   text_file = "data/textified_projects.txt"
 }
 
-// this text file contains the ids of all the projects that were successfully textified and written to the output text file.
+// Textified project ids output file. The ids of all projects that were successfully textified will be written to this location.
 var ids_file;
 if (argv.textified_ids) {
   ids_file = argv.textified_ids + ".ids"
@@ -157,55 +157,28 @@ else {
   ids_file = "data/textified_ids.ids"
 }
 
+
+// Errors file. The ids of all projects that had errors will be written to this location.
 var errors_file;
 if (argv.errors) {
-  ids_file = argv.errors + ".err"
+  errors_file = argv.errors + ".err"
 }
 else {
-  ids_file = "data/errors.err"
+  errors_file = "data/errors.err"
 }
 
 
-console.log("csv_file: ", csv_file)
-console.log("text_file: ", text_file)
-
-var stream = fs.createReadStream(csv_file)
-var csvStream = csv.parse()
-  .on("data", function(data) {
-    if (data[0] != "id") {
-      PROJECT_IDS.push(data[0])
-    }
-
-  })
-  .on("end", function() {
-    console.log("done constructing the list of the project ids")
-
-    console.log("Size of PROJECT_IDS: ", PROJECT_IDS.length)
-    if (argv.project_id) {
-      q.push([argv.project_id]);
-    }
-
-    else {
-      q.push(PROJECT_IDS);
-    }
-
-    // graceful_fs.open(text_file, "w", function(err, file) {
-    //   if (err) throw err
-    //
-    //
-    // });
+console.log("========= Logs: ")
+console.log("project ids file: ", csv_file);
+console.log("textified projects file: ", text_file);
+console.log("textified project ids file: ", ids_file);
+console.log("errors file: ", errors_file)
 
 
+// =============================================== CONTROL FLOW ===============================================================
 
-  });
-
-  stream.pipe(csvStream)
-
-
-
-// =============================================== HELPER FUNCTIONS ===============================================================
-
-
+// INDIVIDUAL TASK:
+//    consisting of sequential asynchronous functions.
 const task = function(project_id, callback) {
   console.log("PROJECT_ID: ", project_id)
   async.waterfall([
@@ -232,13 +205,12 @@ const task = function(project_id, callback) {
       throw err;
     })
 
-
   });
 }
 
-
+// QUEUE:
+//    for applying task above to each project.
 const q = async.queue(task, 1);
-
 
 q.drain(function() {
   // when everything is done,
@@ -246,6 +218,46 @@ q.drain(function() {
   logErrors(ERRORS);
   console.log("========= EVERYTHING IS DONE!")
 });
+
+
+
+// Handle command line arguments and push tasks to queue.
+if (!argv.project_ids_list) {
+    var stream = fs.createReadStream(csv_file)
+    var csvStream = csv.parse()
+      .on("data", function(data) {
+        if (data[0] != "id") {
+          PROJECT_IDS.push(data[0])
+        }
+
+      })
+      .on("end", function() {
+        console.log("done constructing the list of the project ids")
+
+        console.log("Size of PROJECT_IDS: ", PROJECT_IDS.length)
+        if (argv.project_id) {
+          q.push([argv.project_id]);
+        }
+
+        else {
+          q.push(PROJECT_IDS);
+        }
+
+      });
+
+      stream.pipe(csvStream)
+}
+
+else {
+  PROJECT_IDS = argv.project_ids_list.split(",");
+  PROJECT_IDS = PROJECT_IDS.map(x => x.trim()); // trim any whitespace
+  console.log("PROJECT_IDS: ", PROJECT_IDS);
+  console.log("type: ", typeof(PROJECT_IDS));
+  console.log("type of PROJECT_IDS first element: ", typeof(PROJECT_IDS[0]))
+
+  q.push(PROJECT_IDS);
+}
+
 
 // print out the status of the queue workers list every second.
 setInterval(function () {
@@ -256,6 +268,9 @@ setInterval(function () {
 }, 1000);
 
 
+
+// =============================================== HELPER FUNCTIONS ===============================================================
+
 function convertProject(project_id, callback) {
     console.log("PROJECT_ID: ", project_id)
     convert(project_id.toString())
@@ -264,7 +279,7 @@ function convertProject(project_id, callback) {
     })
     .catch((err) => {
       ERRORS += project_id + "\n"
-      callback(err); // stops the waterfall
+      callback(err, project_id); // stops the waterfall
     });
 }
 
@@ -273,7 +288,7 @@ function parseProject(body, project_id, callback) {
     parser(body, false, (err, results) => {
       if (err) {
         ERRORS += project_id + "\n"
-        callback(err);
+        callback(err, project_id);
       }
 
       else {
@@ -348,10 +363,10 @@ function writeResults(project_text, project_id, callback) {
 
     graceful_fs.appendFile(text_file, project_text + "\n", function(err) {
       // if (err) return callback(err);
-      if (err) callback(err);
+      if (err) callback(err, project_id);
       // write project id to another file to keep track
       graceful_fs.appendFile(ids_file, project_id + "\n", function(err) {
-        if (err) callback(err);
+        if (err) callback(err, project_id);
         callback(null, project_id); // complete the waterfall
       });
 
