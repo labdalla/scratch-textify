@@ -106,7 +106,7 @@ function textifyDataset (batch_index) {
     }
 
     // Code != 0 means error
-    else if (code !== 0) && (!timeout) {
+    else if ((code !== 0) && (!timeout)) {
       timeout = false
       // log error
       error = "***** ERROR ***** " + current_batch + "\n"
