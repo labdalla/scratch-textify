@@ -18,6 +18,8 @@ const MASTER_PROJECT_IDS_CSV = "ids/project_ids.csv"
 const MASTER_PROJECT_IDS = []
 
 
+var timeout = false
+
 var stream = fs.createReadStream(MASTER_PROJECT_IDS_CSV)
 var csvStream = csv.parse()
   .on("data", function(data) {
@@ -71,7 +73,9 @@ function textifyDataset (batch_index) {
   console.log("current_batch: ", current_batch);
 
   // create the corresponding project ids csv file for the current batch
-  current_project_ids = MASTER_PROJECT_IDS.slice(low, (high+1)).toString() // pass in a string of sequence of project ids
+  current_project_ids = MASTER_PROJECT_IDS.slice(low, (high+1))
+  console.log("current_project_ids length: ", current_project_ids.length)
+  current_project_ids = current_project_ids.toString() // pass in a string of sequence of project ids
 
 
   var next_batch_index = batch_index + 1
@@ -94,6 +98,7 @@ function textifyDataset (batch_index) {
     if (code === 0) {
       // log success
       success = "***** SUCCESS ***** " + current_batch + "\n"
+      console.log("ABOUT TO APPEND SUCCESS TO MASTER LOG!")
       graceful_fs.appendFile(MASTER_LOG, success, function(err) {
         // recursive step
         textifyDataset(next_batch_index);
@@ -101,7 +106,8 @@ function textifyDataset (batch_index) {
     }
 
     // Code != 0 means error
-    else if (code !== 0) {
+    else if (code !== 0) && (!timeout) {
+      timeout = false
       // log error
       error = "***** ERROR ***** " + current_batch + "\n"
       graceful_fs.appendFile(MASTER_LOG, error, function(err) {
@@ -112,24 +118,25 @@ function textifyDataset (batch_index) {
   });
 
 
-  forked_process.on('close', (code, signal) => {
-    console.log('child process terminated due to receiving signal ${signal}');
-
-    // recursive step
-    textifyDataset(next_batch_index);
-  });
+  // forked_process.on('close', (code, signal) => {
+  //   console.log('child process terminated due to receiving signal ${signal}');
+  //
+  //   // recursive step
+  //   textifyDataset(next_batch_index);
+  // });
 
 
   // Watchdog timer for 30 mins
   setTimeout(function() {
     console.log('batch ' + current_batch + ' timed out!');
+    timeout = true;
 
     // log timeout
     timeout = "***** TIMEOUT ***** " + current_batch + "\n"
     graceful_fs.appendFile(MASTER_LOG, timeout, function(err) {
       // kill process after logging the timeout
-      forked_process.kill('SIGHUP');
+      forked_process.kill();
     });
-  }, 1800000)
+  }, 120000);
 
 }
