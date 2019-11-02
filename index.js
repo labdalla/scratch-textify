@@ -8,8 +8,8 @@ const fs = require("fs");
 
 
 // TODO: change NUM_BATCHES back to 600 when done testing!
-const NUM_BATCHES = 3
-// const NUM_BATCHES = 600
+// const NUM_BATCHES = 3
+const NUM_BATCHES = 600
 const BATCH_SIZE = 1000
 const MASTER_LOG = "data/master.log"
 
