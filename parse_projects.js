@@ -674,7 +674,6 @@ function traverse(all_blocks_json, current_block_json) {
         nested_block_json = all_blocks_json[nested_block_id]
         // For some projects, SUBSTACK or SUBSTACK2 might have null when there are no blocks nested in that part of the if/if_else block
         // as opposed to not having the SUBSTACK / SUBSTACK2 key altogether.
-        // TODO: change (and remove) the condition below if above bug gets fixed or there's another way around it.
         if (nested_block_id != null) {
           blocks_string += " _STARTNEST_ "
           nested_block_string = traverse(all_blocks_json, nested_block_json)

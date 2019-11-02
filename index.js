@@ -74,13 +74,6 @@ function textifyDataset (batch_index) {
   current_project_ids = MASTER_PROJECT_IDS.slice(low, (high+1)).toString() // pass in a string of sequence of project ids
 
 
-  // setup the command line arguments
-  var project_ids_arg = "--project_ids_list " + current_batch
-  var textified_projects_arg = "--textified_projects " + "data/" + current_batch
-  var textified_ids_arg = "--textified_ids " + "data/" + current_batch
-  var errors_arg = "--errors " + "data/" + current_batch
-
-
   var next_batch_index = batch_index + 1
 
   var path = "parse_projects.js"
@@ -91,7 +84,6 @@ function textifyDataset (batch_index) {
               "--errors", filepath_shorthand]
 
   // Otherwise, fork a new process and wait for it to exit before moving on to the next batch
-  // var forked_process = process.fork("parse_projects.js", [project_ids_arg, textified_projects_arg, textified_ids_arg, errors_arg]);
   var forked_process = process.fork(path, args);
 
 
