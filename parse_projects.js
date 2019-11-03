@@ -128,7 +128,10 @@ var PROJECT_IDS = []
 var ERRORS = ""
 
 // const ERRORS_TEXT_FILE = "errors.txt"
-
+// var count = 0
+var empty_projects_count = 0
+var parse_projects_count = 0
+var convert_projects_count = 0
 
 // Project ids input file, containing ids of all projects to be textified
 var csv_file;
@@ -217,6 +220,9 @@ q.drain(function() {
   // log all the project ids that had associated errors
   logErrors(ERRORS);
   console.log("========= EVERYTHING IS DONE!")
+  console.log("empty_projects_count: ", empty_projects_count);
+  console.log("parse_projects_count: ", parse_projects_count);
+  console.log("convert_projects_count: ", convert_projects_count);
 });
 
 
@@ -256,15 +262,20 @@ else {
   console.log("type of PROJECT_IDS first element: ", typeof(PROJECT_IDS[0]))
 
   q.push(PROJECT_IDS);
+  console.log("PROJECT_IDS were just pushed to queue!");
+  console.log("PROJECT_IDS length: ", PROJECT_IDS.length);
 }
 
 
 // print out the status of the queue workers list every second.
-setInterval(function () {
+var timer = setInterval(function () {
   console.log("************** QUEUE INFORMATION **************");
   console.dir(q.length());
   console.dir(q.running());
   console.dir(q.workersList());
+  if ((q.length() === 0) && (q.running() === 0)) {
+    clearInterval(timer);
+  }
 }, 1000);
 
 
@@ -272,6 +283,7 @@ setInterval(function () {
 // =============================================== HELPER FUNCTIONS ===============================================================
 
 function convertProject(project_id, callback) {
+    convert_projects_count += 1
     console.log("PROJECT_ID: ", project_id)
     convert(project_id.toString())
     .then((result) => {
@@ -285,6 +297,8 @@ function convertProject(project_id, callback) {
 
 function parseProject(body, project_id, callback) {
     // Parse the converted project
+    parse_projects_count += 1
+
     parser(body, false, (err, results) => {
       if (err) {
         ERRORS += project_id + "\n"
@@ -356,6 +370,7 @@ function textifyProject(project, project_id, callback) {
 
 function writeResults(project_text, project_id, callback) {
   if (project_text.length === 0) {
+    empty_projects_count += 1
     callback(null, project_id); // complete the waterfall
     return;
   }

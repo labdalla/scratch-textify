@@ -9,7 +9,7 @@ const fs = require("fs");
 
 // TODO: change NUM_BATCHES back to 600 when done testing!
 // const NUM_BATCHES = 3
-const NUM_BATCHES = 600
+const NUM_BATCHES = 800
 const BATCH_SIZE = 1000
 const MASTER_LOG = "data/master.log"
 
@@ -92,7 +92,7 @@ function textifyDataset (batch_index) {
 
 
   forked_process.on('exit', (code) => {
-    console.log('child process exited with code ${code}');
+    console.log('child process exited with code ', code);
 
     // Code = 0 means successful exiting
     if (code === 0) {
@@ -106,14 +106,23 @@ function textifyDataset (batch_index) {
     }
 
     // Code != 0 means error
-    else if ((code !== 0) && (!timeout)) {
-      timeout = false
-      // log error
-      error = "***** ERROR ***** " + current_batch + "\n"
-      graceful_fs.appendFile(MASTER_LOG, error, function(err) {
+    else if ((code !== 0)) {
+
+      if (timeout) {
+        timeout = false
         // recursive step
         textifyDataset(next_batch_index);
-      });
+      }
+
+      else {
+        // log error
+        error = "***** ERROR ***** " + current_batch + "\n"
+        graceful_fs.appendFile(MASTER_LOG, error, function(err) {
+          // recursive step
+          textifyDataset(next_batch_index);
+        });
+      }
+
     }
   });
 
@@ -136,7 +145,8 @@ function textifyDataset (batch_index) {
     graceful_fs.appendFile(MASTER_LOG, timeout, function(err) {
       // kill process after logging the timeout
       forked_process.kill();
+
     });
-  }, 120000);
+  }, 1800000);
 
 }
