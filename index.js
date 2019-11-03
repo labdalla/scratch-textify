@@ -61,7 +61,8 @@ function textifyDataset (batch_index) {
   console.log("batch_index: ", batch_index);
 
   // base case:  no more batches to textify, since we got to the 600th batch
-  if (batch_index === NUM_BATCHES) {
+  if (batch_index === (NUM_BATCHES + 1)) {
+    clearTimeout(timer);
     return
   }
 
@@ -100,8 +101,11 @@ function textifyDataset (batch_index) {
       success = "***** SUCCESS ***** " + current_batch + "\n"
       console.log("ABOUT TO APPEND SUCCESS TO MASTER LOG!")
       graceful_fs.appendFile(MASTER_LOG, success, function(err) {
+        console.log("successfully appended to master log! Going to return now.");
+        clearTimeout(timer);
+
         // recursive step
-        textifyDataset(next_batch_index);
+        return textifyDataset(next_batch_index);
       });
     }
 
@@ -110,8 +114,10 @@ function textifyDataset (batch_index) {
 
       if (timeout) {
         timeout = false
+        clearTimeout(timer);
+
         // recursive step
-        textifyDataset(next_batch_index);
+        return textifyDataset(next_batch_index);
       }
 
       else {
@@ -119,8 +125,10 @@ function textifyDataset (batch_index) {
         // log error
         error = "***** ERROR ***** " + current_batch + "\n"
         graceful_fs.appendFile(MASTER_LOG, error, function(err) {
+          clearTimeout(timer);
+
           // recursive step
-          textifyDataset(next_batch_index);
+          return textifyDataset(next_batch_index);
         });
       }
 
@@ -128,16 +136,8 @@ function textifyDataset (batch_index) {
   });
 
 
-  // forked_process.on('close', (code, signal) => {
-  //   console.log('child process terminated due to receiving signal ${signal}');
-  //
-  //   // recursive step
-  //   textifyDataset(next_batch_index);
-  // });
-
-
   // Watchdog timer for 30 mins
-  setTimeout(function() {
+  var timer = setTimeout(function() {
     console.log('batch ' + current_batch + ' timed out!');
     timeout = true;
 
