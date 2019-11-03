@@ -115,6 +115,7 @@ function textifyDataset (batch_index) {
       }
 
       else {
+        console.log("batch " + current_batch + ' had some error (not a timeout)!');
         // log error
         error = "***** ERROR ***** " + current_batch + "\n"
         graceful_fs.appendFile(MASTER_LOG, error, function(err) {
