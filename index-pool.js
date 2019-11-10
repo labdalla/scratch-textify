@@ -28,6 +28,9 @@ for (let i in batch_list) {
           console.error(err);
         })
         .then(function () {
-          pool.terminate(); // terminate all workers when done
-        });
+          // don't terminate all workers when done,
+          // because we want those workers to keep going through the batches
+        })
+        .timeout(1800000);
+
 }
